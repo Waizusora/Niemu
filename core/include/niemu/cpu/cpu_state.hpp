@@ -88,7 +88,8 @@ constexpr std::uint64_t PState::pack() const noexcept {
            (static_cast<std::uint64_t>(a) << 8U) |
            (static_cast<std::uint64_t>(i) << 7U) |
            (static_cast<std::uint64_t>(f) << 6U) |
-           (static_cast<std::uint64_t>(current_el_placeholder) << 0U);
+           (static_cast<std::uint64_t>(single_step) << 21U) |
+           (static_cast<std::uint64_t>(illegal_execution_state) << 20U);
 }
 
 } // namespace niemu::cpu
