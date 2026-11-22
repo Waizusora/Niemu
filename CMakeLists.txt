@@ -10,6 +10,8 @@ option(NIEMU_BUILD_TESTS "Build Niemu native tests" ON)
 
 add_library(niemu_core STATIC
     core/src/version.cpp
+    core/src/cpu/cpu_state.cpp
+    core/src/cpu/system_registers.cpp
 )
 
 target_include_directories(niemu_core
