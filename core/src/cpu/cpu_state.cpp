@@ -47,13 +47,16 @@ std::uint64_t CpuState::read_reg(std::uint8_t index, bool reg31_is_sp) const noe
     if (index < kGeneralRegisterCount) {
         return x_[index];
     }
-    return reg31_is_sp ? read_sp_current() : 0;
+    if (index == kGeneralRegisterCount) {
+        return reg31_is_sp ? read_sp_current() : 0;
+    }
+    return 0;
 }
 
 void CpuState::write_reg(std::uint8_t index, bool reg31_is_sp, std::uint64_t value) noexcept {
     if (index < kGeneralRegisterCount) {
         x_[index] = value;
-    } else if (reg31_is_sp) {
+    } else if (index == kGeneralRegisterCount && reg31_is_sp) {
         write_sp_current(value);
     }
 }
