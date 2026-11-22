@@ -23,3 +23,18 @@ The Android application owns lifecycle, permissions, SAF document access, and se
 ## Current milestone
 
 The initial repository milestone contains only the native build skeleton, version API, smoke test, and CI. No guest instruction execution or guest boot is implemented yet.
+
+
+## AArch64 CPU foundation
+
+The first CPU slice defines a host-independent guest architectural state:
+
+- X0-X30 general-purpose registers; register encoding 31 is handled explicitly as SP or XZR by the instruction-facing accessors.
+- Separate SP storage for EL0 through EL3.
+- PC and current exception level.
+- A compact PSTATE model for NZCV, DAIF, single-step, and illegal-execution-state flags.
+- A typed system-register access layer for the implemented NZCV, DAIF, CurrentEL, and SP_ELn registers.
+
+The system-register layer intentionally returns an unavailable result for registers that are not implemented. It does not silently fabricate values. ELR_EL1, ESR_EL1, and FAR_EL1 are reserved in the enum for later exception-model work and are not yet readable or writable.
+
+This is an initial state model, not a complete Arm ARM implementation. In particular, exception entry/return, SPSel semantics, access permissions/traps, system-register encodings, and architectural feature discovery remain future work. Guest privileged state is modeled in software and must never be executed directly on the Android host.
