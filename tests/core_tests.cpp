@@ -50,6 +50,13 @@ int main() {
     if (state.read_sp_current() != 0x1000U) {
         return fail("XZR write must be discarded");
     }
+    if (state.read_reg(32U, true) != 0U) {
+        return fail("invalid register index must read as zero");
+    }
+    state.write_reg(32U, true, 0x99U);
+    if (state.read_sp_current() != 0x1000U) {
+        return fail("invalid register index must not alias SP");
+    }
 
     state.pstate().set_nzcv(0xAU);
     const auto nzcv = SystemRegisters::read(state, SystemRegister::NZCV);
