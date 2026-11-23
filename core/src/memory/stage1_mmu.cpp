@@ -68,7 +68,7 @@ VirtualAddressTranslation Stage1Mmu::translate(
             return fault(MmuFault::PermissionFault, level);
         }
         if (access == MemoryAccess::Execute &&
-            ((descriptor & kPxn) != 0U || (descriptor & kUxn) != 0U)) {
+            ((descriptor & kPxn) != 0U)) {
             return fault(MmuFault::PermissionFault, level);
         }
 
