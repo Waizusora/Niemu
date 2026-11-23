@@ -14,6 +14,7 @@ add_library(niemu_core STATIC
     core/src/cpu/system_registers.cpp
     core/src/cpu/decoder.cpp
     core/src/cpu/interpreter.cpp
+    core/src/memory/memory_bus.cpp
 )
 
 target_include_directories(niemu_core
