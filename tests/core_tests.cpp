@@ -409,7 +409,7 @@ int main() {
     // invalidate only the emulator-owned TLB; no host TLBI is executed.
     CpuState tlbi_state;
     tlbi_state.set_pc(0x7000U);
-    tlbi_state.write_x(3U, (0x55ULL << 48U) | va);
+    tlbi_state.write_x(3U, (0x55ULL << 48U) | (va >> 12U));
     if (AArch64Interpreter::execute(tlbi_state, tlbi_va) !=
             ExecutionStatus::RequiresTlb || tlbi_state.pc() != 0x7000U)
         return fail("TLBI requires guest TLB context");
@@ -456,7 +456,7 @@ int main() {
     if (!asid_one_refill.ok() || tlb.entry_count() != 2U)
         return fail("ASID translation refills after ASIDE1");
     tlbi_state.set_pc(0x7300U);
-    tlbi_state.write_x(3U, (1ULL << 48U) | va);
+    tlbi_state.write_x(3U, (1ULL << 48U) | (va >> 12U));
     if (AArch64Interpreter::execute(tlbi_state, tlbi_va, nullptr, &tlb) !=
             ExecutionStatus::Executed || tlb.entry_count() != 1U)
         return fail("TLBI VAE1 matches VA and ASID");
