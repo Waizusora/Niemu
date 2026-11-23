@@ -53,13 +53,15 @@ VirtualAddressTranslation Stage1Mmu::translate(
         if (!is_table && !is_block && !is_page) {
             return fault(MmuFault::TranslationFault, level);
         }
-        if ((descriptor & kAccessFlag) == 0U) {
-            return fault(MmuFault::AccessFlagFault, level);
-        }
-
         if (is_table) {
             table = descriptor & kAddressMask;
             continue;
+        }
+
+        // AF belongs to block/page leaf descriptors; table descriptors
+        // carry hierarchical permission controls in their upper bits.
+        if ((descriptor & kAccessFlag) == 0U) {
+            return fault(MmuFault::AccessFlagFault, level);
         }
 
         const bool read_only = (descriptor & kApEl1ReadOnly) != 0U;
