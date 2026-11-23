@@ -460,6 +460,7 @@ int main() {
     if (AArch64Interpreter::execute(tlbi_state, tlbi_va, nullptr, &tlb) !=
             ExecutionStatus::Executed || tlb.entry_count() != 1U)
         return fail("TLBI VAE1 matches VA and ASID");
+    state.translation_registers().ttbr0_el1 = 0x0200000000001000ULL;
     if (!tlb.translate(state, page_table_bus, va, MemoryAccess::Read).ok() ||
         tlb.entry_count() != 1U)
         return fail("VAE1 preserves other ASID at same VA");
