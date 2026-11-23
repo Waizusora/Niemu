@@ -74,3 +74,12 @@ The interpreter now executes integer GPR LDR/STR unsigned-immediate instructions
 The guest physical address space maps non-overlapping guest-physical ranges onto bounded RAM backing stores. Each mapping has an explicit base, size, backing offset, and read/write/execute permission mask. The bus resolves accesses through the map and enforces permissions before touching backing RAM. Accesses that are unmapped, cross a region boundary, overflow the address range, or violate permissions fail deterministically.
 
 This is the physical mapping layer, not an MMU. It does not yet interpret AArch64 translation table descriptors, walk guest page tables, implement TCR/TTBR/MAIR controls, model stage-1 or stage-2 translation, or route MMIO to devices. The execute permission is exposed for the forthcoming instruction-fetch path; the current interpreter still receives decoded instructions from its caller.
+
+
+## Initial EL1 Stage-1 MMU
+
+The native core now has a deliberately limited Stage-1 translation walker for the EL1&0 TTBR0 regime. It accepts 39-bit virtual addresses, a 4KB granule, and the three-level L1-L3 walk. It recognizes table descriptors, 1GB/2MB block descriptors at supported levels, and 4KB page descriptors. Descriptor reads are performed through the physical memory bus, so inaccessible page-table memory returns a physical-access fault.
+
+The initial permission subset checks the access flag, EL1 read-only AP bit, and PXN for EL1 instruction execution. Fault results distinguish disabled translation, unsupported TCR configuration, address-size, translation, access-flag, permission, and physical page-table access faults. The implementation does not yet model EL0 permission checks, UXN effects, hierarchical permission controls, memory attributes from MAIR, shareability/cacheability, TBI, ASIDs, TTBR1, TLBs, break-before-make, TLBI operations, stage-2 translation, or architectural exception syndrome delivery. The caller must explicitly invoke this translator; the existing data bus and interpreter are not yet transparently virtual-address aware.
+
+The supported TCR subset requires T0SZ=25, TG0=00 (4KB), and EPD0=0. SCTLR_EL1.M controls whether translation is enabled. Reset values are modeled as TTBR0=0, TCR.T0SZ=25 with the other bits clear, MAIR=0, and SCTLR=0. This is a foundation for future integration, not a claim of full Arm architecture compliance or Linux boot capability.
