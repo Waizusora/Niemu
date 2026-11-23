@@ -17,7 +17,11 @@ enum class SystemRegister : std::uint16_t {
     SP_EL3 = 0xE218,
     ELR_EL1 = 0xE201,
     ESR_EL1 = 0xE202,
-    FAR_EL1 = 0xE203
+    FAR_EL1 = 0xE203,
+    TTBR0_EL1 = 0xE180,
+    TCR_EL1 = 0xE181,
+    MAIR_EL1 = 0xE182,
+    SCTLR_EL1 = 0xE183
 };
 
 class SystemRegisters final {
