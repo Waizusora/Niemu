@@ -55,7 +55,7 @@ The decoder returns a typed record containing the raw encoding and extracted ope
 
 ## Initial interpreter
 
-The first interpreter slice executes the decoded MOVN/MOVZ/MOVK, ADD/ADDS/SUB/SUBS immediate, B/BL, B.cond, BR/BLR, and RET instruction families. It updates the guest PC and the implemented architectural flags. Load/store instructions are decoded but return RequiresMemoryBus until the guest memory interface and fault model are connected. Unsupported instructions return UnsupportedInstruction and do not advance PC.
+The first interpreter slice executes the decoded MOVN/MOVZ/MOVK, ADD/ADDS/SUB/SUBS immediate, B/BL, B.cond, BR/BLR, and RET instruction families. It updates the guest PC and the implemented architectural flags. Load/store instructions are decoded and the supported unsigned-immediate GPR subset executes through the guest memory bus. Architectural exception delivery remains future work. Unsupported instructions return UnsupportedInstruction and do not advance PC.
 
 The interpreter is the semantic reference for future DBT/JIT work. This subset is not sufficient to boot Linux or claim general AArch64 compatibility.
 
