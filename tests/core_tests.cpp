@@ -4,6 +4,7 @@
 #include "niemu/cpu/system_registers.hpp"
 #include "niemu/memory/memory_bus.hpp"
 #include "niemu/memory/address_space.hpp"
+#include "niemu/memory/stage1_mmu.hpp"
 #include "niemu/version.hpp"
 
 #include <cstdlib>
