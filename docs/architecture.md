@@ -51,3 +51,10 @@ The decoder currently recognizes a bounded instruction subset:
 - Integer GPR LDR/STR unsigned-immediate encodings.
 
 The decoder returns a typed record containing the raw encoding and extracted operands. It does not execute instructions. Unsupported or reserved encodings are reported as Unsupported. Execution semantics, condition evaluation, memory access faults, and architectural exception delivery belong to the interpreter and subsequent CPU model layers.
+
+
+## Initial interpreter
+
+The first interpreter slice executes the decoded MOVN/MOVZ/MOVK, ADD/ADDS/SUB/SUBS immediate, B/BL, B.cond, BR/BLR, and RET instruction families. It updates the guest PC and the implemented architectural flags. Load/store instructions are decoded but return RequiresMemoryBus until the guest memory interface and fault model are connected. Unsupported instructions return UnsupportedInstruction and do not advance PC.
+
+The interpreter is the semantic reference for future DBT/JIT work. This subset is not sufficient to boot Linux or claim general AArch64 compatibility.
