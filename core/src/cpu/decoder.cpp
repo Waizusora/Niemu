@@ -22,14 +22,20 @@ namespace {
 DecodedInstruction AArch64Decoder::decode(std::uint32_t instruction) noexcept {
     auto out = base(instruction);
 
-    // TLBI VMALLE1 (S1_0_C8_C7_0) and VAE1 (S1_0_C8_C3_1).
+    // TLBI VMALLE1 (C8,C7,0), VAE1 (C8,C7,1), ASIDE1 (C8,C7,2).
     // Other TLBI operations remain unsupported until their operand semantics exist.
+    if ((instruction & 0xFFFFFFE0U) == 0xD5088740U) {
+        out.kind = InstructionKind::Tlbi;
+        out.tlbi_op = TlbiOperation::ASIDE1;
+        out.rn = static_cast<std::uint8_t>(instruction & 0x1FU);
+        return out;
+    }
     if (instruction == 0xD508871FU) {
         out.kind = InstructionKind::Tlbi;
         out.tlbi_op = TlbiOperation::VMALLE1;
         return out;
     }
-    if ((instruction & 0xFFFFFFE0U) == 0xD5088320U) {
+    if ((instruction & 0xFFFFFFE0U) == 0xD5088720U) {
         out.kind = InstructionKind::Tlbi;
         out.tlbi_op = TlbiOperation::VAE1;
         out.rn = static_cast<std::uint8_t>(instruction & 0x1FU);
