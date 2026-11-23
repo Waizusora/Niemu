@@ -46,7 +46,7 @@ public:
         std::uint64_t backing_offset = 0U,
         MemoryPermission permissions = MemoryPermission::Read |
                                       MemoryPermission::Write |
-                                      MemoryPermission::Execute) noexcept;
+                                      MemoryPermission::Execute);
 
     [[nodiscard]] AddressTranslation translate(
         std::uint64_t guest_address, std::size_t length,
