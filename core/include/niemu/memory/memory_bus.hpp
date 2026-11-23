@@ -4,15 +4,16 @@
 #include <cstdint>
 #include <vector>
 
-namespace niemu::memory {
-
+namespace niemu::memory {\n\nclass GuestAddressSpace;\n
 enum class MemoryFault : std::uint8_t {
     None,
     OutOfBounds,
     AddressOverflow,
     UnalignedAccess,
     InvalidWidth,
-    NullBuffer
+    NullBuffer,
+    UnmappedAddress,
+    PermissionDenied
 };
 
 enum class UnalignedAccessPolicy : std::uint8_t {
@@ -50,15 +51,13 @@ private:
 
 class MemoryBus final {
 public:
-    explicit MemoryBus(GuestMemory& memory) noexcept : memory_(memory) {}
-
+    explicit MemoryBus(GuestMemory& memory) noexcept : memory_(&memory) {}\n    explicit MemoryBus(GuestAddressSpace& address_space) noexcept\n        : address_space_(&address_space) {}\n
     [[nodiscard]] MemoryAccessResult read(
         std::uint64_t address, std::uint8_t width, std::uint64_t& value) const noexcept;
     [[nodiscard]] MemoryAccessResult write(
         std::uint64_t address, std::uint8_t width, std::uint64_t value) noexcept;
 
 private:
-    GuestMemory& memory_;
-};
+    GuestMemory* memory_{nullptr};\n    GuestAddressSpace* address_space_{nullptr};\n};
 
 } // namespace niemu::memory
