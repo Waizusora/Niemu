@@ -18,6 +18,10 @@ SystemRegisters::read(const CpuState& state, SystemRegister reg) noexcept {
     case SystemRegister::SP_EL1: return state.read_sp(ExceptionLevel::EL1);
     case SystemRegister::SP_EL2: return state.read_sp(ExceptionLevel::EL2);
     case SystemRegister::SP_EL3: return state.read_sp(ExceptionLevel::EL3);
+    case SystemRegister::TTBR0_EL1: return state.translation_registers().ttbr0_el1;
+    case SystemRegister::TCR_EL1: return state.translation_registers().tcr_el1;
+    case SystemRegister::MAIR_EL1: return state.translation_registers().mair_el1;
+    case SystemRegister::SCTLR_EL1: return state.translation_registers().sctlr_el1;
     default:
         return std::nullopt;
     }
@@ -38,6 +42,10 @@ bool SystemRegisters::write(CpuState& state, SystemRegister reg, std::uint64_t v
     case SystemRegister::SP_EL1: state.write_sp(ExceptionLevel::EL1, value); return true;
     case SystemRegister::SP_EL2: state.write_sp(ExceptionLevel::EL2, value); return true;
     case SystemRegister::SP_EL3: state.write_sp(ExceptionLevel::EL3, value); return true;
+    case SystemRegister::TTBR0_EL1: state.translation_registers().ttbr0_el1 = value; return true;
+    case SystemRegister::TCR_EL1: state.translation_registers().tcr_el1 = value; return true;
+    case SystemRegister::MAIR_EL1: state.translation_registers().mair_el1 = value; return true;
+    case SystemRegister::SCTLR_EL1: state.translation_registers().sctlr_el1 = value; return true;
     default:
         return false;
     }
