@@ -354,6 +354,10 @@ int main() {
         return fail("2MB block virtual-to-physical translation");
 
 
+    if (!page_table_bus.write(0x3000U + 4U * 8U, 8U,
+                              0x8003U | (1ULL << 10U)).ok())
+        return fail("restore leaf descriptor before TLB tests");
+
     niemu::memory::Stage1Tlb tlb;
     const auto tlb_first = tlb.translate(state, page_table_bus, va, MemoryAccess::Read);
     if (!tlb_first.ok() || tlb_first.physical_address != 0x8123U ||
