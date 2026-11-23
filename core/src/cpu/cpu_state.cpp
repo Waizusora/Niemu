@@ -8,6 +8,7 @@ void CpuState::reset() noexcept {
     pc_ = 0;
     current_el_ = ExceptionLevel::EL1;
     pstate_ = {};
+    translation_registers_ = {};
     pstate_.d = true;
     pstate_.a = true;
     pstate_.i = true;
