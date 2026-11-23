@@ -133,13 +133,18 @@ int main() {
     if (tlbi_all.kind != InstructionKind::Tlbi ||
         tlbi_all.tlbi_op != niemu::cpu::TlbiOperation::VMALLE1)
         return fail("TLBI VMALLE1 decode");
-    const auto tlbi_va = AArch64Decoder::decode(0xD5088323U);
+    const auto tlbi_va = AArch64Decoder::decode(0xD5088723U);
     if (tlbi_va.kind != InstructionKind::Tlbi ||
         tlbi_va.tlbi_op != niemu::cpu::TlbiOperation::VAE1 ||
         tlbi_va.rn != 3U)
         return fail("TLBI VAE1 decode");
-    if (AArch64Decoder::decode(0xD5088720U).kind != InstructionKind::Unsupported)
-        return fail("unsupported TLBI variant classification");
+    const auto tlbi_asid = AArch64Decoder::decode(0xD5088743U);
+    if (tlbi_asid.kind != InstructionKind::Tlbi ||
+        tlbi_asid.tlbi_op != niemu::cpu::TlbiOperation::ASIDE1 ||
+        tlbi_asid.rn != 3U)
+        return fail("TLBI ASIDE1 decode");
+    if (AArch64Decoder::decode(0xD5088323U).kind != InstructionKind::Unsupported)
+        return fail("TLBI VAE1IS remains unsupported");
     const auto str = AArch64Decoder::decode(0xB9000C62U);
     if (str.kind != InstructionKind::LoadStoreUnsignedImmediate ||
         str.load_store_op != LoadStoreOperation::STR || str.access_size != 4U ||
@@ -416,6 +421,47 @@ int main() {
     const auto tlb_after_vae1 = tlb.translate(state, page_table_bus, va, MemoryAccess::Read);
     if (!tlb_after_vae1.ok() || tlb_after_vae1.physical_address != 0x9123U)
         return fail("TLBI VAE1 permits translation refill");
+
+    // Non-global translations for distinct ASIDs coexist in the local TLB.
+    tlb.invalidate_all();
+    if (!page_table_bus.write(0x3000U + 4U * 8U, 8U,
+                              0x9003U | (1ULL << 10U) | (1ULL << 11U)).ok())
+        return fail("set non-global leaf descriptor");
+    const auto original_ttbr = state.translation_registers().ttbr0_el1;
+    state.translation_registers().ttbr0_el1 = 0x0100000000001000ULL;
+    const auto asid_one = tlb.translate(state, page_table_bus, va, MemoryAccess::Read);
+    state.translation_registers().ttbr0_el1 = 0x0200000000001000ULL;
+    const auto asid_two = tlb.translate(state, page_table_bus, va, MemoryAccess::Read);
+    if (!asid_one.ok() || !asid_two.ok() || tlb.entry_count() != 2U)
+        return fail("TLB ASID tagging and coexistence");
+
+    tlbi_state.set_pc(0x7200U);
+    tlbi_state.write_x(3U, 1ULL << 48U);
+    if (AArch64Interpreter::execute(tlbi_state, tlbi_asid, nullptr, &tlb) !=
+            ExecutionStatus::Executed || tlb.entry_count() != 1U)
+        return fail("TLBI ASIDE1 removes selected non-global ASID");
+    if (!tlb.translate(state, page_table_bus, va, MemoryAccess::Read).ok() ||
+        tlb.entry_count() != 1U)
+        return fail("ASIDE1 preserves other ASID cache entry");
+
+    state.translation_registers().ttbr0_el1 = 0x0100000000001000ULL;
+    const auto asid_one_refill = tlb.translate(state, page_table_bus, va, MemoryAccess::Read);
+    if (!asid_one_refill.ok() || tlb.entry_count() != 2U)
+        return fail("ASID translation refills after ASIDE1");
+    tlbi_state.set_pc(0x7300U);
+    tlbi_state.write_x(3U, (1ULL << 48U) | va);
+    if (AArch64Interpreter::execute(tlbi_state, tlbi_va, nullptr, &tlb) !=
+            ExecutionStatus::Executed || tlb.entry_count() != 1U)
+        return fail("TLBI VAE1 matches VA and ASID");
+    if (!tlb.translate(state, page_table_bus, va, MemoryAccess::Read).ok() ||
+        tlb.entry_count() != 1U)
+        return fail("VAE1 preserves other ASID at same VA");
+
+    state.translation_registers().ttbr0_el1 = original_ttbr;
+    if (!page_table_bus.write(0x3000U + 4U * 8U, 8U,
+                              0x9003U | (1ULL << 10U)).ok())
+        return fail("restore global leaf descriptor");
+    tlb.invalidate_all();
 
     if (!tlb.translate(state, page_table_bus, va, MemoryAccess::Read).ok())
         return fail("refill TLB before VMALLE1");
