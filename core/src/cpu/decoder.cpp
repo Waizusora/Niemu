@@ -25,7 +25,7 @@ DecodedInstruction AArch64Decoder::decode(std::uint32_t instruction) noexcept {
     // Move wide immediate: MOVN, MOVZ, MOVK.
     if ((instruction & 0x1F800000U) == 0x12800000U) {
         const auto opc = static_cast<std::uint8_t>((instruction >> 29U) & 0x3U);
-        if (opc == 0x3U) return out;
+        if (opc == 0x1U) return out;
         out.kind = InstructionKind::MoveWide;
         out.is_64_bit = (instruction >> 31U) != 0U;
         out.move_wide_op = opc == 0U ? MoveWideOperation::MOVN
