@@ -22,10 +22,10 @@ MemoryAccessResult GuestAddressSpace::map_ram(
         size > static_cast<std::uint64_t>(backing.size()) - backing_offset) {
         return {MemoryFault::OutOfBounds};
     }
-    const auto new_end = guest_base + size;
+    const auto new_last = guest_base + (size - 1U);
     for (const auto& region : regions_) {
-        const auto region_end = region.base + region.size;
-        if (guest_base < region_end && region.base < new_end) {
+        const auto region_last = region.base + (region.size - 1U);
+        if (guest_base <= region_last && region.base <= new_last) {
             return {MemoryFault::AddressOverflow};
         }
     }
