@@ -52,7 +52,7 @@ void set_sub_flags(PState& flags, std::uint64_t lhs, std::uint64_t rhs,
 
 ExecutionStatus AArch64Interpreter::execute(
     CpuState& state, const DecodedInstruction& instruction,
-    memory::MemoryBus* memory_bus) noexcept {
+    memory::MemoryBus* memory_bus, memory::Stage1Tlb* stage1_tlb) noexcept {
     const auto pc = state.pc();
     const auto next_pc = pc + 4U;
 
@@ -132,6 +132,24 @@ ExecutionStatus AArch64Interpreter::execute(
         state.set_pc(next_pc);
         return ExecutionStatus::Executed;
     }
+
+    case InstructionKind::Tlbi:
+        if (state.current_el() != ExceptionLevel::EL1)
+            return ExecutionStatus::PrivilegeFault;
+        if (stage1_tlb == nullptr) return ExecutionStatus::RequiresTlb;
+        if (instruction.tlbi_op == TlbiOperation::VMALLE1) {
+            stage1_tlb->invalidate_all();
+        } else if (instruction.tlbi_op == TlbiOperation::VAE1) {
+            // VAE1 invalidates by VA for all ASIDs. This implementation has
+            // no ASID/global-entry model and keys translations by 4KB page.
+            constexpr std::uint64_t kVaOperandMask = 0x00FFFFFFFFFFF000ULL;
+            const auto operand = state.read_x(instruction.rn);
+            stage1_tlb->invalidate_va(operand & kVaOperandMask);
+        } else {
+            return ExecutionStatus::UnsupportedInstruction;
+        }
+        state.set_pc(next_pc);
+        return ExecutionStatus::Executed;
 
     case InstructionKind::Unsupported:
     default:
