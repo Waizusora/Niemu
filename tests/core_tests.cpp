@@ -416,10 +416,14 @@ int main() {
     if (!tlb.translate(state, page_table_bus, va, MemoryAccess::Read).ok() ||
         tlb.entry_count() != 1U)
         return fail("populate global translation before VAE1");
-    if (AArch64Interpreter::execute(tlbi_state, tlbi_va, nullptr, &tlb) !=
-            ExecutionStatus::Executed || tlbi_state.pc() != 0x7004U ||
-        tlb.entry_count() != 0U)
-        return fail("TLBI VAE1 invalidates VA and advances PC");
+    const auto vae1_status =
+        AArch64Interpreter::execute(tlbi_state, tlbi_va, nullptr, &tlb);
+    if (vae1_status != ExecutionStatus::Executed)
+        return fail("TLBI VAE1 execution status");
+    if (tlbi_state.pc() != 0x7004U)
+        return fail("TLBI VAE1 PC advance");
+    if (tlb.entry_count() != 0U)
+        return fail("TLBI VAE1 cache invalidation");
 
     const auto tlb_after_vae1 = tlb.translate(state, page_table_bus, va, MemoryAccess::Read);
     if (!tlb_after_vae1.ok() || tlb_after_vae1.physical_address != 0x9123U)
