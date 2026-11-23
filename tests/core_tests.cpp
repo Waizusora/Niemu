@@ -130,6 +130,6 @@ int main() {
     if (AArch64Decoder::decode(0xFFFFFFFFU).kind != InstructionKind::Unsupported)
         return fail("unsupported instruction classification");
 
-    std::cout << "Niemu CPU and decoder tests passed\\n";
+    std::cout << "Niemu CPU and decoder tests passed\n";
     return EXIT_SUCCESS;
 }
