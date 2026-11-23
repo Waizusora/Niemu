@@ -192,7 +192,7 @@ int main() {
         return fail("guest memory null buffer validation");
     if (bus.read(64U, 8U, memory_value).fault != MemoryFault::OutOfBounds)
         return fail("guest memory upper-bound validation");
-    if (bus.read(std::numeric_limits<std::uint64_t>::max(), 8U, memory_value).fault !=
+    if (bus.read(std::numeric_limits<std::uint64_t>::max() - 7U, 8U, memory_value).fault !=
         MemoryFault::OutOfBounds)
         return fail("guest memory large-address validation");
     if (bus.read(0U, 3U, memory_value).fault != MemoryFault::InvalidWidth)
@@ -211,7 +211,7 @@ int main() {
     memory_state.set_pc(0x6000U);
     memory_state.write_x(1U, 0U);
     memory_state.write_x(0U, 0xFFFFFFFFFFFFFFFFULL);
-    if (AArch64Interpreter::execute(memory_state, AArch64Decoder::decode(0xB9400820U),
+    if (AArch64Interpreter::execute(memory_state, AArch64Decoder::decode(0xB9401020U),
                                    &bus) != ExecutionStatus::Executed ||
         memory_state.read_x(0U) != 0x55667788U || memory_state.pc() != 0x6004U)
         return fail("interpreter W-register LDR zero extension");
