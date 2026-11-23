@@ -4,7 +4,10 @@
 #include <cstdint>
 #include <vector>
 
-namespace niemu::memory {\n\nclass GuestAddressSpace;\n
+namespace niemu::memory {
+
+class GuestAddressSpace;
+
 enum class MemoryFault : std::uint8_t {
     None,
     OutOfBounds,
@@ -51,13 +54,18 @@ private:
 
 class MemoryBus final {
 public:
-    explicit MemoryBus(GuestMemory& memory) noexcept : memory_(&memory) {}\n    explicit MemoryBus(GuestAddressSpace& address_space) noexcept\n        : address_space_(&address_space) {}\n
+    explicit MemoryBus(GuestMemory& memory) noexcept : memory_(&memory) {}
+    explicit MemoryBus(GuestAddressSpace& address_space) noexcept
+        : address_space_(&address_space) {}
+
     [[nodiscard]] MemoryAccessResult read(
         std::uint64_t address, std::uint8_t width, std::uint64_t& value) const noexcept;
     [[nodiscard]] MemoryAccessResult write(
         std::uint64_t address, std::uint8_t width, std::uint64_t value) noexcept;
 
 private:
-    GuestMemory* memory_{nullptr};\n    GuestAddressSpace* address_space_{nullptr};\n};
+    GuestMemory* memory_{nullptr};
+    GuestAddressSpace* address_space_{nullptr};
+};
 
 } // namespace niemu::memory
