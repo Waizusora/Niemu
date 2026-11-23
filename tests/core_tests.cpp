@@ -413,6 +413,9 @@ int main() {
     if (AArch64Interpreter::execute(tlbi_state, tlbi_va) !=
             ExecutionStatus::RequiresTlb || tlbi_state.pc() != 0x7000U)
         return fail("TLBI requires guest TLB context");
+    if (!tlb.translate(state, page_table_bus, va, MemoryAccess::Read).ok() ||
+        tlb.entry_count() != 1U)
+        return fail("populate global translation before VAE1");
     if (AArch64Interpreter::execute(tlbi_state, tlbi_va, nullptr, &tlb) !=
             ExecutionStatus::Executed || tlbi_state.pc() != 0x7004U ||
         tlb.entry_count() != 0U)
