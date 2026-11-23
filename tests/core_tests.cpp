@@ -129,6 +129,17 @@ int main() {
     if (ldr.kind != InstructionKind::LoadStoreUnsignedImmediate ||
         ldr.load_store_op != LoadStoreOperation::LDR || ldr.access_size != 8U ||
         ldr.immediate != 16U) return fail("LDR unsigned immediate decode");
+    const auto tlbi_all = AArch64Decoder::decode(0xD508871FU);
+    if (tlbi_all.kind != InstructionKind::Tlbi ||
+        tlbi_all.tlbi_op != niemu::cpu::TlbiOperation::VMALLE1)
+        return fail("TLBI VMALLE1 decode");
+    const auto tlbi_va = AArch64Decoder::decode(0xD5088323U);
+    if (tlbi_va.kind != InstructionKind::Tlbi ||
+        tlbi_va.tlbi_op != niemu::cpu::TlbiOperation::VAE1 ||
+        tlbi_va.rn != 3U)
+        return fail("TLBI VAE1 decode");
+    if (AArch64Decoder::decode(0xD5088720U).kind != InstructionKind::Unsupported)
+        return fail("unsupported TLBI variant classification");
     const auto str = AArch64Decoder::decode(0xB9000C62U);
     if (str.kind != InstructionKind::LoadStoreUnsignedImmediate ||
         str.load_store_op != LoadStoreOperation::STR || str.access_size != 4U ||
@@ -388,6 +399,35 @@ int main() {
     tlb.invalidate_all();
     if (tlb.entry_count() != 0U)
         return fail("TLB global invalidation");
+
+    // Architectural TLBI operations are interpreted in guest state and
+    // invalidate only the emulator-owned TLB; no host TLBI is executed.
+    CpuState tlbi_state;
+    tlbi_state.set_pc(0x7000U);
+    tlbi_state.write_x(3U, va);
+    if (AArch64Interpreter::execute(tlbi_state, tlbi_va) !=
+            ExecutionStatus::RequiresTlb || tlbi_state.pc() != 0x7000U)
+        return fail("TLBI requires guest TLB context");
+    if (AArch64Interpreter::execute(tlbi_state, tlbi_va, nullptr, &tlb) !=
+            ExecutionStatus::Executed || tlbi_state.pc() != 0x7004U ||
+        tlb.entry_count() != 0U)
+        return fail("TLBI VAE1 invalidates VA and advances PC");
+
+    const auto tlb_after_vae1 = tlb.translate(state, page_table_bus, va, MemoryAccess::Read);
+    if (!tlb_after_vae1.ok() || tlb_after_vae1.physical_address != 0x9123U)
+        return fail("TLBI VAE1 permits translation refill");
+
+    if (!tlb.translate(state, page_table_bus, va, MemoryAccess::Read).ok())
+        return fail("refill TLB before VMALLE1");
+    tlbi_state.set_pc(0x7100U);
+    if (AArch64Interpreter::execute(tlbi_state, tlbi_all, nullptr, &tlb) !=
+            ExecutionStatus::Executed || tlbi_state.pc() != 0x7104U ||
+        tlb.entry_count() != 0U)
+        return fail("TLBI VMALLE1 global invalidation");
+    tlbi_state.set_current_el(ExceptionLevel::EL0);
+    if (AArch64Interpreter::execute(tlbi_state, tlbi_all, nullptr, &tlb) !=
+            ExecutionStatus::PrivilegeFault || tlbi_state.pc() != 0x7104U)
+        return fail("TLBI EL0 privilege fault");
 
     const auto tlb_refill = tlb.translate(state, page_table_bus, va, MemoryAccess::Read);
     if (!tlb_refill.ok() || tlb_refill.physical_address != 0x9123U)
