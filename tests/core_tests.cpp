@@ -1,5 +1,6 @@
 #include "niemu/cpu/cpu_state.hpp"
 #include "niemu/cpu/decoder.hpp"
+#include "niemu/cpu/interpreter.hpp"
 #include "niemu/cpu/system_registers.hpp"
 #include "niemu/version.hpp"
 
@@ -129,6 +130,48 @@ int main() {
         str.immediate != 12U) return fail("STR unsigned immediate decode");
     if (AArch64Decoder::decode(0xFFFFFFFFU).kind != InstructionKind::Unsupported)
         return fail("unsupported instruction classification");
+
+
+    using niemu::cpu::AArch64Interpreter;
+    using niemu::cpu::ExecutionStatus;
+
+    CpuState exec_state;
+    exec_state.set_pc(0x1000U);
+    const auto movz_exec = AArch64Decoder::decode(0xD2824680U);
+    if (AArch64Interpreter::execute(exec_state, movz_exec) != ExecutionStatus::Executed ||
+        exec_state.read_x(0U) != 0x1234U || exec_state.pc() != 0x1004U)
+        return fail("interpreter MOVZ execution");
+
+    exec_state.write_x(1U, 7U);
+    const auto add_exec = AArch64Decoder::decode(0x91001420U);
+    if (AArch64Interpreter::execute(exec_state, add_exec) != ExecutionStatus::Executed ||
+        exec_state.read_x(0U) != 12U || exec_state.pc() != 0x1008U)
+        return fail("interpreter ADD immediate execution");
+
+    exec_state.set_pc(0x2000U);
+    const auto bl_exec = AArch64Decoder::decode(0x94000002U);
+    if (AArch64Interpreter::execute(exec_state, bl_exec) != ExecutionStatus::Executed ||
+        exec_state.pc() != 0x2008U || exec_state.read_x(30U) != 0x2004U)
+        return fail("interpreter BL execution");
+
+    exec_state.set_pc(0x3000U);
+    exec_state.pstate().z = true;
+    const auto beq_exec = AArch64Decoder::decode(0x54000040U);
+    if (AArch64Interpreter::execute(exec_state, beq_exec) != ExecutionStatus::Executed ||
+        exec_state.pc() != 0x3008U)
+        return fail("interpreter taken B.EQ");
+
+    exec_state.set_pc(0x4000U);
+    exec_state.pstate().z = false;
+    if (AArch64Interpreter::execute(exec_state, beq_exec) != ExecutionStatus::Executed ||
+        exec_state.pc() != 0x4004U)
+        return fail("interpreter not-taken B.EQ");
+
+    exec_state.set_pc(0x5000U);
+    const auto ldr_exec = AArch64Decoder::decode(0xF9400820U);
+    if (AArch64Interpreter::execute(exec_state, ldr_exec) != ExecutionStatus::RequiresMemoryBus ||
+        exec_state.pc() != 0x5000U)
+        return fail("interpreter defers memory instruction");
 
     std::cout << "Niemu CPU and decoder tests passed\n";
     return EXIT_SUCCESS;
