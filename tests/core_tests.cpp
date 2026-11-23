@@ -1,4 +1,5 @@
 #include "niemu/cpu/cpu_state.hpp"
+#include "niemu/cpu/decoder.hpp"
 #include "niemu/cpu/system_registers.hpp"
 #include "niemu/version.hpp"
 
