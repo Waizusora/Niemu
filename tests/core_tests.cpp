@@ -5,6 +5,7 @@
 #include "niemu/memory/memory_bus.hpp"
 #include "niemu/memory/address_space.hpp"
 #include "niemu/memory/stage1_mmu.hpp"
+#include "niemu/memory/stage1_tlb.hpp"
 #include "niemu/version.hpp"
 
 #include <cstdlib>
@@ -351,6 +352,50 @@ int main() {
     if (!block_translation.ok() || block_translation.physical_address != 0x401234U ||
         block_translation.translation_level != 2U)
         return fail("2MB block virtual-to-physical translation");
+
+
+    niemu::memory::Stage1Tlb tlb;
+    const auto tlb_first = tlb.translate(state, page_table_bus, va, MemoryAccess::Read);
+    if (!tlb_first.ok() || tlb_first.physical_address != 0x8123U ||
+        tlb.entry_count() != 1U || tlb.miss_count() != 1U)
+        return fail("TLB first translation and fill");
+    const auto tlb_hit = tlb.translate(state, page_table_bus, va + 0x20U, MemoryAccess::Read);
+    if (!tlb_hit.ok() || tlb_hit.physical_address != 0x8143U ||
+        tlb.hit_count() != 1U || tlb.miss_count() != 1U)
+        return fail("TLB hit preserves page offset");
+    const auto tlb_write = tlb.translate(state, page_table_bus, va, MemoryAccess::Write);
+    if (!tlb_write.ok() || tlb_write.physical_address != 0x8123U ||
+        tlb.entry_count() != 2U)
+        return fail("TLB access type is part of cache key");
+
+    if (!page_table_bus.write(0x3000U + 4U * 8U, 8U,
+                              0x9003U | (1ULL << 10U)).ok())
+        return fail("remap leaf descriptor for TLB invalidation");
+    const auto stale_translation = tlb.translate(state, page_table_bus, va, MemoryAccess::Read);
+    if (!stale_translation.ok() || stale_translation.physical_address != 0x8123U)
+        return fail("TLB retains mapping until explicit invalidation");
+    tlb.invalidate_va(va);
+    const auto refreshed_translation = tlb.translate(
+        state, page_table_bus, va, MemoryAccess::Read);
+    if (!refreshed_translation.ok() || refreshed_translation.physical_address != 0x9123U)
+        return fail("TLB virtual-address invalidation");
+    if (tlb.entry_count() != 1U)
+        return fail("TLB invalidation removes all access variants for page");
+    tlb.invalidate_all();
+    if (tlb.entry_count() != 0U)
+        return fail("TLB global invalidation");
+
+    const auto tlb_refill = tlb.translate(state, page_table_bus, va, MemoryAccess::Read);
+    if (!tlb_refill.ok() || tlb_refill.physical_address != 0x9123U)
+        return fail("TLB refill after global invalidation");
+    if (!SystemRegisters::write(state, SystemRegister::SCTLR_EL1, 0U))
+        return fail("disable MMU for TLB configuration flush");
+    if (tlb.translate(state, page_table_bus, va, MemoryAccess::Read).fault !=
+            niemu::memory::MmuFault::Disabled || tlb.entry_count() != 0U)
+        return fail("TLB flush on translation control change");
+    if (!SystemRegisters::write(state, SystemRegister::SCTLR_EL1, 1U) ||
+        !SystemRegisters::write(state, SystemRegister::TCR_EL1, 25U))
+        return fail("restore MMU controls after TLB tests");
 
     if (niemu::memory::Stage1Mmu::translate(
             state, page_table_bus, 1ULL << 39U, MemoryAccess::Read).fault !=
