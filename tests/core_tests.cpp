@@ -3,6 +3,7 @@
 #include "niemu/cpu/interpreter.hpp"
 #include "niemu/cpu/system_registers.hpp"
 #include "niemu/memory/memory_bus.hpp"
+#include "niemu/memory/address_space.hpp"
 #include "niemu/version.hpp"
 
 #include <cstdlib>
@@ -245,6 +246,46 @@ int main() {
             ExecutionStatus::MemoryAddressOverflow ||
         memory_state.pc() != 0x6400U)
         return fail("interpreter effective-address overflow");
+
+    using niemu::memory::GuestAddressSpace;
+    using niemu::memory::MemoryAccess;
+    using niemu::memory::MemoryPermission;
+
+    GuestMemory mapped_backing(128U);
+    GuestAddressSpace address_space;
+    const auto rw = MemoryPermission::Read | MemoryPermission::Write;
+    const auto rx = MemoryPermission::Read | MemoryPermission::Execute;
+    if (!address_space.map_ram(0x1000U, 64U, mapped_backing, 16U, rw).ok())
+        return fail("map RAM region");
+    if (!address_space.map_ram(0x2000U, 32U, mapped_backing, 80U, rx).ok())
+        return fail("map second RAM region");
+    if (address_space.region_count() != 2U)
+        return fail("address space region count");
+    if (address_space.map_ram(0x1030U, 16U, mapped_backing).fault !=
+        MemoryFault::AddressOverflow)
+        return fail("reject overlapping RAM regions");
+    if (address_space.map_ram(std::numeric_limits<std::uint64_t>::max(), 2U,
+                              mapped_backing).fault != MemoryFault::OutOfBounds)
+        return fail("reject guest region address overflow");
+    if (address_space.translate(0x3000U, 4U, MemoryAccess::Read).fault !=
+        MemoryFault::UnmappedAddress)
+        return fail("unmapped guest physical address");
+    if (address_space.translate(0x2000U, 4U, MemoryAccess::Write).fault !=
+        MemoryFault::PermissionDenied)
+        return fail("read-only region write permission");
+    if (address_space.translate(0x2000U, 4U, MemoryAccess::Execute).fault !=
+        MemoryFault::None)
+        return fail("executable region permission");
+
+    MemoryBus mapped_bus(address_space);
+    if (!mapped_bus.write(0x1008U, 4U, 0xCAFEBABEU).ok() ||
+        !mapped_bus.read(0x1008U, 4U, memory_value).ok() ||
+        memory_value != 0xCAFEBABEU)
+        return fail("address-space bus routing");
+    if (mapped_bus.write(0x2000U, 4U, 0x1234U).fault != MemoryFault::PermissionDenied)
+        return fail("address-space bus enforces write permission");
+    if (mapped_bus.read(0x103EU, 4U, memory_value).fault != MemoryFault::UnmappedAddress)
+        return fail("access cannot cross mapped region boundary");
 
     std::cout << "Niemu CPU and decoder tests passed\n";
     return EXIT_SUCCESS;
