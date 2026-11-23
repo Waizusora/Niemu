@@ -140,10 +140,12 @@ ExecutionStatus AArch64Interpreter::execute(
         if (instruction.tlbi_op == TlbiOperation::VMALLE1) {
             stage1_tlb->invalidate_all();
         } else if (instruction.tlbi_op == TlbiOperation::VAE1) {
-            constexpr std::uint64_t kVaOperandMask = 0x00FFFFFFFFFFF000ULL;
+            // TLBI operand packs ASID in [63:48] and VA[55:12] in [43:0].
+            constexpr std::uint64_t kVaOperandMask = 0x00000FFFFFFFFFFFULL;
             const auto operand = state.read_x(instruction.rn);
             const auto asid = static_cast<std::uint16_t>((operand >> 48U) & 0xFFFFU);
-            stage1_tlb->invalidate_va_asid(operand & kVaOperandMask, asid);
+            const auto virtual_address = (operand & kVaOperandMask) << 12U;
+            stage1_tlb->invalidate_va_asid(virtual_address, asid);
         } else if (instruction.tlbi_op == TlbiOperation::ASIDE1) {
             const auto asid = static_cast<std::uint16_t>(
                 (state.read_x(instruction.rn) >> 48U) & 0xFFFFU);
