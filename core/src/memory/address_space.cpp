@@ -16,7 +16,7 @@ namespace {
 
 MemoryAccessResult GuestAddressSpace::map_ram(
     std::uint64_t guest_base, std::uint64_t size, GuestMemory& backing,
-    std::uint64_t backing_offset, MemoryPermission permissions) noexcept {
+    std::uint64_t backing_offset, MemoryPermission permissions) {
     if (size == 0U || guest_base > std::numeric_limits<std::uint64_t>::max() - (size - 1U) ||
         backing_offset > static_cast<std::uint64_t>(backing.size()) ||
         size > static_cast<std::uint64_t>(backing.size()) - backing_offset) {
