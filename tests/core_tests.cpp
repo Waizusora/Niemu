@@ -288,6 +288,92 @@ int main() {
     if (mapped_bus.read(0x103EU, 4U, memory_value).fault != MemoryFault::UnmappedAddress)
         return fail("access cannot cross mapped region boundary");
 
-    std::cout << "Niemu CPU and decoder tests passed\n";
+
+    if (!SystemRegisters::write(state, SystemRegister::TTBR0_EL1, 0x1000U) ||
+        !SystemRegisters::write(state, SystemRegister::TCR_EL1, 25U) ||
+        !SystemRegisters::write(state, SystemRegister::MAIR_EL1, 0xFFU) ||
+        !SystemRegisters::write(state, SystemRegister::SCTLR_EL1, 1U))
+        return fail("EL1 translation system-register writes");
+    if (SystemRegisters::read(state, SystemRegister::TTBR0_EL1) != 0x1000U ||
+        SystemRegisters::read(state, SystemRegister::TCR_EL1) != 25U ||
+        SystemRegisters::read(state, SystemRegister::SCTLR_EL1) != 1U)
+        return fail("EL1 translation system-register reads");
+
+    GuestMemory page_tables(1U << 20U);
+    MemoryBus page_table_bus(page_tables);
+    constexpr std::uint64_t va = 0x4123U;
+    if (!page_table_bus.write(0x1000U, 8U, 0x2003U).ok() ||
+        !page_table_bus.write(0x2000U, 8U, 0x3003U).ok() ||
+        !page_table_bus.write(0x3000U + 4U * 8U, 8U, 0x8003U | (1ULL << 10U)).ok())
+        return fail("construct 4KB translation tables");
+    const auto page_translation = niemu::memory::Stage1Mmu::translate(
+        state, page_table_bus, va, MemoryAccess::Read);
+    if (!page_translation.ok() || page_translation.physical_address != 0x8123U ||
+        page_translation.translation_level != 3U)
+        return fail("4KB page virtual-to-physical translation");
+    const auto write_translation = niemu::memory::Stage1Mmu::translate(
+        state, page_table_bus, va, MemoryAccess::Write);
+    if (!write_translation.ok() || write_translation.physical_address != 0x8123U)
+        return fail("EL1 writable page translation");
+
+    if (!page_table_bus.write(0x3000U + 4U * 8U, 8U,
+                              0x8003U | (1ULL << 10U) | (1ULL << 7U)).ok())
+        return fail("set page read-only AP");
+    if (niemu::memory::Stage1Mmu::translate(
+            state, page_table_bus, va, MemoryAccess::Write).fault !=
+        niemu::memory::MmuFault::PermissionFault)
+        return fail("EL1 read-only page permission fault");
+    if (!page_table_bus.write(0x3000U + 4U * 8U, 8U,
+                              0x8003U | (1ULL << 10U) | (1ULL << 53U)).ok())
+        return fail("set page PXN");
+    if (niemu::memory::Stage1Mmu::translate(
+            state, page_table_bus, va, MemoryAccess::Execute).fault !=
+        niemu::memory::MmuFault::PermissionFault)
+        return fail("EL1 PXN execute permission fault");
+    if (!page_table_bus.write(0x3000U + 4U * 8U, 8U, 0x8003U).ok())
+        return fail("clear page access flag");
+    if (niemu::memory::Stage1Mmu::translate(
+            state, page_table_bus, va, MemoryAccess::Read).fault !=
+        niemu::memory::MmuFault::AccessFlagFault)
+        return fail("access flag fault");
+    if (!page_table_bus.write(0x3000U + 4U * 8U, 8U, 0U).ok())
+        return fail("invalidate page descriptor");
+    if (niemu::memory::Stage1Mmu::translate(
+            state, page_table_bus, va, MemoryAccess::Read).fault !=
+        niemu::memory::MmuFault::TranslationFault)
+        return fail("invalid page descriptor translation fault");
+
+    if (!page_table_bus.write(0x2000U + 1U * 8U, 8U,
+                              0x400000U | 1U | (1ULL << 10U)).ok())
+        return fail("construct level-2 block descriptor");
+    const auto block_translation = niemu::memory::Stage1Mmu::translate(
+        state, page_table_bus, 0x201234U, MemoryAccess::Read);
+    if (!block_translation.ok() || block_translation.physical_address != 0x401234U ||
+        block_translation.translation_level != 2U)
+        return fail("2MB block virtual-to-physical translation");
+
+    if (niemu::memory::Stage1Mmu::translate(
+            state, page_table_bus, 1ULL << 39U, MemoryAccess::Read).fault !=
+        niemu::memory::MmuFault::AddressSizeFault)
+        return fail("39-bit virtual address size fault");
+    if (!SystemRegisters::write(state, SystemRegister::TCR_EL1, 24U) ||
+        niemu::memory::Stage1Mmu::translate(
+            state, page_table_bus, va, MemoryAccess::Read).fault !=
+        niemu::memory::MmuFault::UnsupportedConfiguration)
+        return fail("unsupported TCR configuration");
+    if (!SystemRegisters::write(state, SystemRegister::TCR_EL1, 25U) ||
+        !SystemRegisters::write(state, SystemRegister::SCTLR_EL1, 0U) ||
+        niemu::memory::Stage1Mmu::translate(
+            state, page_table_bus, va, MemoryAccess::Read).fault !=
+        niemu::memory::MmuFault::Disabled)
+        return fail("MMU disabled state");
+    state.reset();
+    if (state.translation_registers().ttbr0_el1 != 0U ||
+        state.translation_registers().tcr_el1 != 25U ||
+        state.translation_registers().mair_el1 != 0U ||
+        state.translation_registers().sctlr_el1 != 0U)
+        return fail("translation registers reset defaults");
+
+    std::cout << "Niemu CPU, memory, and MMU tests passed\n";
     return EXIT_SUCCESS;
 }
