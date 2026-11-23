@@ -90,3 +90,10 @@ The supported TCR subset requires T0SZ=25, TG0=00 (4KB), and EPD0=0. SCTLR_EL1.M
 A per-CPU `Stage1Tlb` now caches successful Stage-1 translations in a fixed 64-entry array with round-robin replacement. Cache keys include the 4KB virtual page and access class (read, write, or execute), preventing a permission-approved translation from being reused for a different access type. The cached physical page retains the original translation level and reconstructs the byte offset on a hit. Faults are never cached.
 
 The TLB exposes per-VA-page invalidation and global invalidation primitives. Changes to TTBR0_EL1, TCR_EL1, or SCTLR_EL1 are detected and automatically flush the cache. Changes to guest page-table memory are not detected automatically: the guest or machine model must perform the architecturally appropriate TLBI operation (not implemented yet) or call an invalidation primitive before relying on the new mapping. This is a software cache foundation, not a complete architectural TLB: ASIDs, global/non-global entries, shareability, broadcast TLBI, and architectural TLBI instruction decoding remain future work.
+
+
+## Initial architectural TLBI support
+
+The interpreter recognizes two EL1 TLBI operations: `VMALLE1` and `VAE1`. They operate only on the emulator-owned `Stage1Tlb` supplied by the machine execution context; guest privileged instructions are never issued to the host CPU. `VMALLE1` clears all cached entries. `VAE1` extracts the VA operand from Xt and invalidates the corresponding 4KB page across the currently modeled access classes.
+
+TLBI execution is EL1-only in this subset. Execution without a TLB context returns `RequiresTlb` without advancing PC; execution from EL0 returns `PrivilegeFault`. The current TLB has no ASID, global/non-global, shareability, or broadcast model. `VAE1` therefore implements only VA-page invalidation for this limited single-regime cache. `VMALLE1IS`, `VAE1IS`, ASID-targeted operations, range TLBI, and all other TLBI encodings remain unsupported. This is not complete architectural TLBI or Linux-ready MMU support.
