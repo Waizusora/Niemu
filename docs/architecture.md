@@ -67,3 +67,10 @@ The initial memory layer provides a zero-initialized, bounded guest RAM region a
 The default alignment policy rejects misaligned multi-byte scalar accesses. A memory instance may instead allow unaligned accesses. This is a configurable initial policy, not a complete implementation of AArch64 alignment behavior: SCTLR controls, memory attributes, stage-1/stage-2 translation, permission checks, and architectural data-abort exceptions are future work.
 
 The interpreter now executes integer GPR LDR/STR unsigned-immediate instructions through an optional memory bus. Base register encoding 31 selects SP; transfer register encoding 31 selects XZR/WZR. Successful W-register loads zero-extend naturally, and PC advances only after a successful access. Missing buses, address overflow, and memory faults return distinct execution statuses and leave PC unchanged.
+
+
+## Guest physical address space
+
+The guest physical address space maps non-overlapping guest-physical ranges onto bounded RAM backing stores. Each mapping has an explicit base, size, backing offset, and read/write/execute permission mask. The bus resolves accesses through the map and enforces permissions before touching backing RAM. Accesses that are unmapped, cross a region boundary, overflow the address range, or violate permissions fail deterministically.
+
+This is the physical mapping layer, not an MMU. It does not yet interpret AArch64 translation table descriptors, walk guest page tables, implement TCR/TTBR/MAIR controls, model stage-1 or stage-2 translation, or route MMIO to devices. The execute permission is exposed for the forthcoming instruction-fetch path; the current interpreter still receives decoded instructions from its caller.
