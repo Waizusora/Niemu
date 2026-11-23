@@ -110,8 +110,27 @@ ExecutionStatus AArch64Interpreter::execute(
         return ExecutionStatus::Executed;
     }
 
-    case InstructionKind::LoadStoreUnsignedImmediate:
-        return ExecutionStatus::RequiresMemoryBus;
+    case InstructionKind::LoadStoreUnsignedImmediate: {
+        if (memory_bus == nullptr) return ExecutionStatus::RequiresMemoryBus;
+        const auto base_address = state.read_reg(instruction.rn, true);
+        if (base_address > std::numeric_limits<std::uint64_t>::max() -
+                               instruction.immediate) {
+            return ExecutionStatus::MemoryAddressOverflow;
+        }
+        const auto address = base_address + instruction.immediate;
+        if (instruction.load_store_op == LoadStoreOperation::LDR) {
+            std::uint64_t value = 0U;
+            const auto result = memory_bus->read(address, instruction.access_size, value);
+            if (!result.ok()) return ExecutionStatus::MemoryAccessFault;
+            state.write_reg(instruction.rd, false, value);
+        } else {
+            const auto value = state.read_reg(instruction.rd, false);
+            const auto result = memory_bus->write(address, instruction.access_size, value);
+            if (!result.ok()) return ExecutionStatus::MemoryAccessFault;
+        }
+        state.set_pc(next_pc);
+        return ExecutionStatus::Executed;
+    }
 
     case InstructionKind::Unsupported:
     default:
