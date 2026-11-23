@@ -76,7 +76,12 @@ VirtualAddressTranslation Stage1Mmu::translate(
         const auto page_size_mask = (1ULL << shift) - 1ULL;
         const auto output_base = descriptor & kAddressMask & ~page_size_mask;
         const auto physical = output_base | (virtual_address & page_size_mask);
-        return {MmuFault::None, physical, level};
+        const bool asid_16_bit = ((regs.tcr_el1 >> 36U) & 1U) != 0U;
+        const auto asid = static_cast<std::uint16_t>(
+            asid_16_bit ? ((regs.ttbr0_el1 >> 48U) & 0xFFFFU)
+                        : ((regs.ttbr0_el1 >> 56U) & 0xFFU));
+        const bool global = (descriptor & (1ULL << 11U)) == 0U;
+        return {MmuFault::None, physical, level, asid, global};
     }
     return fault(MmuFault::TranslationFault, 3U);
 }
