@@ -409,7 +409,7 @@ int main() {
     // invalidate only the emulator-owned TLB; no host TLBI is executed.
     CpuState tlbi_state;
     tlbi_state.set_pc(0x7000U);
-    tlbi_state.write_x(3U, va);
+    tlbi_state.write_x(3U, (0x55ULL << 48U) | va);
     if (AArch64Interpreter::execute(tlbi_state, tlbi_va) !=
             ExecutionStatus::RequiresTlb || tlbi_state.pc() != 0x7000U)
         return fail("TLBI requires guest TLB context");
