@@ -22,7 +22,8 @@ struct VirtualAddressTranslation {
     MmuFault fault{MmuFault::None};
     std::uint64_t physical_address{0};
     std::uint8_t translation_level{0};
-    [[nodiscard]] constexpr bool ok() const noexcept { return fault == MmuFault::None; }
+    std::uint16_t asid{0};
+    bool global{true};    [[nodiscard]] constexpr bool ok() const noexcept { return fault == MmuFault::None; }
 };
 
 class Stage1Mmu final {
