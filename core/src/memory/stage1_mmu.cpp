@@ -9,7 +9,6 @@ constexpr std::uint64_t kDescriptorTypeMask = 3ULL;
 constexpr std::uint64_t kAccessFlag = 1ULL << 10U;
 constexpr std::uint64_t kApEl1ReadOnly = 1ULL << 7U;
 constexpr std::uint64_t kPxn = 1ULL << 53U;
-constexpr std::uint64_t kUxn = 1ULL << 54U;
 
 [[nodiscard]] constexpr VirtualAddressTranslation fault(
     MmuFault reason, std::uint8_t level = 0U) noexcept {
