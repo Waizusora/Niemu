@@ -17,10 +17,6 @@ MemoryAccessResult GuestMemory::validate(
     if (offset > bytes_.size() || length > bytes_.size() - offset) {
         return {MemoryFault::OutOfBounds};
     }
-    if (policy_ == UnalignedAccessPolicy::Reject && length > 1U &&
-        (address % static_cast<std::uint64_t>(length)) != 0U) {
-        return {MemoryFault::UnalignedAccess};
-    }
     return {};
 }
 
@@ -49,6 +45,10 @@ MemoryAccessResult MemoryBus::read(
     if (width != 1U && width != 2U && width != 4U && width != 8U) {
         return {MemoryFault::InvalidWidth};
     }
+    if (memory_.unaligned_policy() == UnalignedAccessPolicy::Reject && width > 1U &&
+        (address % width) != 0U) {
+        return {MemoryFault::UnalignedAccess};
+    }
     std::uint8_t bytes[8]{};
     const auto result = memory_.read_bytes(address, bytes, width);
     if (!result.ok()) return result;
@@ -64,6 +64,10 @@ MemoryAccessResult MemoryBus::write(
     std::uint64_t address, std::uint8_t width, std::uint64_t value) noexcept {
     if (width != 1U && width != 2U && width != 4U && width != 8U) {
         return {MemoryFault::InvalidWidth};
+    }
+    if (memory_.unaligned_policy() == UnalignedAccessPolicy::Reject && width > 1U &&
+        (address % width) != 0U) {
+        return {MemoryFault::UnalignedAccess};
     }
     std::uint8_t bytes[8]{};
     for (std::uint8_t i = 0U; i < width; ++i) {
