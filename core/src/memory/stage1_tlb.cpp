@@ -39,7 +39,7 @@ VirtualAddressTranslation Stage1Tlb::translate(
             ++hits_;
             return {MmuFault::None,
                     (entry.physical_page << 12U) | (virtual_address & kPageOffsetMask),
-                    entry.translation_level};
+                    entry.translation_level, entry.asid, entry.global};
         }
     }
 
