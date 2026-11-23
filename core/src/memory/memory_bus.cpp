@@ -1,4 +1,5 @@
 #include "niemu/memory/memory_bus.hpp"
+#include "niemu/memory/address_space.hpp"
 
 #include <limits>
 
@@ -45,12 +46,19 @@ MemoryAccessResult MemoryBus::read(
     if (width != 1U && width != 2U && width != 4U && width != 8U) {
         return {MemoryFault::InvalidWidth};
     }
-    if (memory_.unaligned_policy() == UnalignedAccessPolicy::Reject && width > 1U &&
-        (address % width) != 0U) {
-        return {MemoryFault::UnalignedAccess};
+    GuestMemory* target = memory_;
+    std::uint64_t target_address = address;
+    if (address_space_ != nullptr) {
+        const auto translated = address_space_->translate(address, width, MemoryAccess::Read);
+        if (!translated.ok()) return {translated.fault};
+        target = translated.memory;
+        target_address = translated.backing_address;
     }
+    if (target == nullptr) return {MemoryFault::UnmappedAddress};
+    if (target->unaligned_policy() == UnalignedAccessPolicy::Reject && width > 1U &&
+        (address % width) != 0U) return {MemoryFault::UnalignedAccess};
     std::uint8_t bytes[8]{};
-    const auto result = memory_.read_bytes(address, bytes, width);
+    const auto result = target->read_bytes(target_address, bytes, width);
     if (!result.ok()) return result;
     std::uint64_t loaded = 0U;
     for (std::uint8_t i = 0U; i < width; ++i) {
@@ -65,16 +73,23 @@ MemoryAccessResult MemoryBus::write(
     if (width != 1U && width != 2U && width != 4U && width != 8U) {
         return {MemoryFault::InvalidWidth};
     }
-    if (memory_.unaligned_policy() == UnalignedAccessPolicy::Reject && width > 1U &&
-        (address % width) != 0U) {
-        return {MemoryFault::UnalignedAccess};
+    GuestMemory* target = memory_;
+    std::uint64_t target_address = address;
+    if (address_space_ != nullptr) {
+        const auto translated = address_space_->translate(address, width, MemoryAccess::Write);
+        if (!translated.ok()) return {translated.fault};
+        target = translated.memory;
+        target_address = translated.backing_address;
     }
+    if (target == nullptr) return {MemoryFault::UnmappedAddress};
+    if (target->unaligned_policy() == UnalignedAccessPolicy::Reject && width > 1U &&
+        (address % width) != 0U) return {MemoryFault::UnalignedAccess};
     std::uint8_t bytes[8]{};
     for (std::uint8_t i = 0U; i < width; ++i) {
         bytes[i] = static_cast<std::uint8_t>(
             (value >> (static_cast<unsigned>(i) * 8U)) & 0xFFU);
     }
-    return memory_.write_bytes(address, bytes, width);
+    return target->write_bytes(target_address, bytes, width);
 }
 
 } // namespace niemu::memory
