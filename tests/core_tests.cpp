@@ -2,10 +2,12 @@
 #include "niemu/cpu/decoder.hpp"
 #include "niemu/cpu/interpreter.hpp"
 #include "niemu/cpu/system_registers.hpp"
+#include "niemu/memory/memory_bus.hpp"
 #include "niemu/version.hpp"
 
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <string_view>
 
 namespace {
@@ -172,6 +174,77 @@ int main() {
     if (AArch64Interpreter::execute(exec_state, ldr_exec) != ExecutionStatus::RequiresMemoryBus ||
         exec_state.pc() != 0x5000U)
         return fail("interpreter defers memory instruction");
+
+    using niemu::memory::GuestMemory;
+    using niemu::memory::MemoryBus;
+    using niemu::memory::MemoryFault;
+    using niemu::memory::UnalignedAccessPolicy;
+
+    GuestMemory guest_memory(64U);
+    MemoryBus bus(guest_memory);
+    if (!bus.write(16U, 8U, 0x1122334455667788ULL).ok())
+        return fail("guest memory 64-bit write");
+    std::uint64_t memory_value = 0U;
+    if (!bus.read(16U, 8U, memory_value).ok() ||
+        memory_value != 0x1122334455667788ULL)
+        return fail("guest memory little-endian scalar read");
+    if (guest_memory.read_bytes(16U, nullptr, 1U).fault != MemoryFault::NullBuffer)
+        return fail("guest memory null buffer validation");
+    if (bus.read(64U, 8U, memory_value).fault != MemoryFault::OutOfBounds)
+        return fail("guest memory upper-bound validation");
+    if (bus.read(std::numeric_limits<std::uint64_t>::max(), 8U, memory_value).fault !=
+        MemoryFault::OutOfBounds)
+        return fail("guest memory large-address validation");
+    if (bus.read(0U, 3U, memory_value).fault != MemoryFault::InvalidWidth)
+        return fail("guest memory width validation");
+    if (bus.read(3U, 4U, memory_value).fault != MemoryFault::UnalignedAccess)
+        return fail("guest memory alignment policy");
+
+    GuestMemory unaligned_memory(32U, UnalignedAccessPolicy::Allow);
+    MemoryBus unaligned_bus(unaligned_memory);
+    if (!unaligned_bus.write(3U, 4U, 0xA1B2C3D4U).ok() ||
+        !unaligned_bus.read(3U, 4U, memory_value).ok() ||
+        memory_value != 0xA1B2C3D4U)
+        return fail("guest memory configurable unaligned access");
+
+    CpuState memory_state;
+    memory_state.set_pc(0x6000U);
+    memory_state.write_x(1U, 0U);
+    memory_state.write_x(0U, 0xFFFFFFFFFFFFFFFFULL);
+    if (AArch64Interpreter::execute(memory_state, AArch64Decoder::decode(0xB9400020U),
+                                   &bus) != ExecutionStatus::Executed ||
+        memory_state.read_x(0U) != 0x55667788U || memory_state.pc() != 0x6004U)
+        return fail("interpreter W-register LDR zero extension");
+
+    memory_state.set_pc(0x6100U);
+    memory_state.write_x(3U, 32U);
+    memory_state.write_x(2U, 0xAABBCCDDU);
+    if (AArch64Interpreter::execute(memory_state, str, &bus) !=
+            ExecutionStatus::MemoryAccessFault ||
+        memory_state.pc() != 0x6100U)
+        return fail("interpreter STR fault preserves PC");
+
+    memory_state.set_pc(0x6200U);
+    memory_state.write_x(3U, 16U);
+    if (AArch64Interpreter::execute(memory_state, str, &bus) !=
+            ExecutionStatus::Executed ||
+        memory_state.pc() != 0x6204U ||
+        !bus.read(28U, 4U, memory_value).ok() || memory_value != 0xAABBCCDDU)
+        return fail("interpreter STR W register");
+
+    memory_state.set_pc(0x6300U);
+    memory_state.write_x(1U, 56U);
+    if (AArch64Interpreter::execute(memory_state, ldr_exec, &bus) !=
+            ExecutionStatus::MemoryAccessFault ||
+        memory_state.pc() != 0x6300U)
+        return fail("interpreter LDR out-of-bounds fault preserves PC");
+
+    memory_state.set_pc(0x6400U);
+    memory_state.write_x(1U, std::numeric_limits<std::uint64_t>::max() - 7U);
+    if (AArch64Interpreter::execute(memory_state, ldr_exec, &bus) !=
+            ExecutionStatus::MemoryAddressOverflow ||
+        memory_state.pc() != 0x6400U)
+        return fail("interpreter effective-address overflow");
 
     std::cout << "Niemu CPU and decoder tests passed\n";
     return EXIT_SUCCESS;
