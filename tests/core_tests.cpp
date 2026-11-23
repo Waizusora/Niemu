@@ -211,13 +211,13 @@ int main() {
     memory_state.set_pc(0x6000U);
     memory_state.write_x(1U, 0U);
     memory_state.write_x(0U, 0xFFFFFFFFFFFFFFFFULL);
-    if (AArch64Interpreter::execute(memory_state, AArch64Decoder::decode(0xB9400020U),
+    if (AArch64Interpreter::execute(memory_state, AArch64Decoder::decode(0xB9400820U),
                                    &bus) != ExecutionStatus::Executed ||
         memory_state.read_x(0U) != 0x55667788U || memory_state.pc() != 0x6004U)
         return fail("interpreter W-register LDR zero extension");
 
     memory_state.set_pc(0x6100U);
-    memory_state.write_x(3U, 32U);
+    memory_state.write_x(3U, 60U);
     memory_state.write_x(2U, 0xAABBCCDDU);
     if (AArch64Interpreter::execute(memory_state, str, &bus) !=
             ExecutionStatus::MemoryAccessFault ||
