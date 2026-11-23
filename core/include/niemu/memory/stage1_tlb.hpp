@@ -21,6 +21,8 @@ public:
 
     // Invalidates the cached 4KB virtual page for every access type.
     void invalidate_va(std::uint64_t virtual_address) noexcept;
+    void invalidate_asid(std::uint16_t asid) noexcept;
+    void invalidate_va_asid(std::uint64_t virtual_address, std::uint16_t asid) noexcept;
 
     [[nodiscard]] std::size_t entry_count() const noexcept;
     [[nodiscard]] std::uint64_t hit_count() const noexcept { return hits_; }
@@ -32,6 +34,8 @@ private:
         std::uint64_t physical_page{0};
         MemoryAccess access{MemoryAccess::Read};
         std::uint8_t translation_level{0};
+        std::uint16_t asid{0};
+        bool global{true};
         bool valid{false};
     };
 
