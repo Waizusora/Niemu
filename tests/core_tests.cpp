@@ -84,6 +84,52 @@ int main() {
         return fail("unimplemented system register write must fail");
     }
 
-    std::cout << "Niemu CPU foundation tests passed\n";
+
+    using niemu::cpu::AArch64Decoder;
+    using niemu::cpu::InstructionKind;
+    using niemu::cpu::MoveWideOperation;
+    using niemu::cpu::AddSubOperation;
+    using niemu::cpu::BranchRegisterOperation;
+    using niemu::cpu::LoadStoreOperation;
+
+    const auto movz = AArch64Decoder::decode(0xD2824680U);
+    if (movz.kind != InstructionKind::MoveWide || movz.move_wide_op != MoveWideOperation::MOVZ ||
+        !movz.is_64_bit || movz.rd != 0U || movz.immediate != 0x1234U) return fail("MOVZ decode");
+    const auto movk = AArch64Decoder::decode(0xF2C00020U);
+    if (movk.kind != InstructionKind::MoveWide || movk.move_wide_op != MoveWideOperation::MOVK ||
+        movk.shift != 32U) return fail("MOVK decode");
+    const auto add = AArch64Decoder::decode(0x91001420U);
+    if (add.kind != InstructionKind::AddSubImmediate || add.add_sub_op != AddSubOperation::ADD ||
+        add.rn != 1U || add.rd != 0U || add.immediate != 5U) return fail("ADD immediate decode");
+    const auto subs = AArch64Decoder::decode(0xF100041FU);
+    if (subs.kind != InstructionKind::AddSubImmediate || subs.add_sub_op != AddSubOperation::SUBS ||
+        !subs.set_flags || subs.rd != 31U || subs.immediate != 1U) return fail("SUBS immediate decode");
+    const auto branch = AArch64Decoder::decode(0x14000004U);
+    if (branch.kind != InstructionKind::BranchImmediate || branch.link ||
+        branch.signed_immediate != 16) return fail("B immediate decode");
+    const auto bl = AArch64Decoder::decode(0x94000002U);
+    if (bl.kind != InstructionKind::BranchImmediate || !bl.link ||
+        bl.signed_immediate != 8) return fail("BL immediate decode");
+    const auto bcond = AArch64Decoder::decode(0x54000040U);
+    if (bcond.kind != InstructionKind::BranchConditional || bcond.condition != 0U ||
+        bcond.signed_immediate != 8) return fail("B.cond decode");
+    const auto br = AArch64Decoder::decode(0xD61F0060U);
+    if (br.kind != InstructionKind::BranchRegister || br.branch_reg_op != BranchRegisterOperation::BR ||
+        br.rn != 3U) return fail("BR decode");
+    const auto ret = AArch64Decoder::decode(0xD65F03C0U);
+    if (ret.kind != InstructionKind::BranchRegister || ret.branch_reg_op != BranchRegisterOperation::RET ||
+        ret.rn != 30U) return fail("RET decode");
+    const auto ldr = AArch64Decoder::decode(0xF9400820U);
+    if (ldr.kind != InstructionKind::LoadStoreUnsignedImmediate ||
+        ldr.load_store_op != LoadStoreOperation::LDR || ldr.access_size != 8U ||
+        ldr.immediate != 16U) return fail("LDR unsigned immediate decode");
+    const auto str = AArch64Decoder::decode(0xB9000C62U);
+    if (str.kind != InstructionKind::LoadStoreUnsignedImmediate ||
+        str.load_store_op != LoadStoreOperation::STR || str.access_size != 4U ||
+        str.immediate != 12U) return fail("STR unsigned immediate decode");
+    if (AArch64Decoder::decode(0xFFFFFFFFU).kind != InstructionKind::Unsupported)
+        return fail("unsupported instruction classification");
+
+    std::cout << "Niemu CPU and decoder tests passed\\n";
     return EXIT_SUCCESS;
 }
