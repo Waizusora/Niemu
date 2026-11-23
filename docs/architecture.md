@@ -22,7 +22,7 @@ The Android application owns lifecycle, permissions, SAF document access, and se
 
 ## Current milestone
 
-The initial repository milestone contains only the native build skeleton, version API, smoke test, and CI. No guest instruction execution or guest boot is implemented yet.
+The native core now includes a bounded guest-memory implementation and scalar memory bus. The interpreter can execute a limited set of AArch64 integer instructions, including unsigned-immediate GPR loads and stores. This remains an early execution subset; MMU translation, architectural data-abort delivery, device memory, and guest boot are not implemented.
 
 
 ## AArch64 CPU foundation
@@ -58,3 +58,12 @@ The decoder returns a typed record containing the raw encoding and extracted ope
 The first interpreter slice executes the decoded MOVN/MOVZ/MOVK, ADD/ADDS/SUB/SUBS immediate, B/BL, B.cond, BR/BLR, and RET instruction families. It updates the guest PC and the implemented architectural flags. Load/store instructions are decoded but return RequiresMemoryBus until the guest memory interface and fault model are connected. Unsupported instructions return UnsupportedInstruction and do not advance PC.
 
 The interpreter is the semantic reference for future DBT/JIT work. This subset is not sufficient to boot Linux or claim general AArch64 compatibility.
+
+
+## Guest memory and scalar bus
+
+The initial memory layer provides a zero-initialized, bounded guest RAM region and a scalar bus for 8-, 16-, 32-, and 64-bit accesses. Scalar values are assembled and serialized explicitly in little-endian order, independent of host byte order. All ranges are validated without computing an unchecked end address; out-of-range accesses fail without exposing host pointers.
+
+The default alignment policy rejects misaligned multi-byte scalar accesses. A memory instance may instead allow unaligned accesses. This is a configurable initial policy, not a complete implementation of AArch64 alignment behavior: SCTLR controls, memory attributes, stage-1/stage-2 translation, permission checks, and architectural data-abort exceptions are future work.
+
+The interpreter now executes integer GPR LDR/STR unsigned-immediate instructions through an optional memory bus. Base register encoding 31 selects SP; transfer register encoding 31 selects XZR/WZR. Successful W-register loads zero-extend naturally, and PC advances only after a successful access. Missing buses, address overflow, and memory faults return distinct execution statuses and leave PC unchanged.
