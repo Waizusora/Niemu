@@ -1,7 +1,7 @@
 #pragma once
 
 #include "niemu/cpu/cpu_state.hpp"
-#include "niemu/memory/memory_bus.hpp"
+#include "niemu/memory/address_space.hpp"
 
 #include <cstdint>
 
