@@ -26,20 +26,19 @@ VirtualAddressTranslation Stage1Tlb::translate(
     const cpu::CpuState& state, const MemoryBus& physical_bus,
     std::uint64_t virtual_address, MemoryAccess access) noexcept {
     (void)synchronize_configuration(state);
-    ++misses_;
     const auto virtual_page = virtual_address >> 12U;
 
     for (auto& entry : entries_) {
         if (entry.valid && entry.virtual_page == virtual_page &&
             entry.access == access) {
             ++hits_;
-            --misses_;
             return {MmuFault::None,
                     (entry.physical_page << 12U) | (virtual_address & kPageOffsetMask),
                     entry.translation_level};
         }
     }
 
+    ++misses_;
     const auto translated = Stage1Mmu::translate(
         state, physical_bus, virtual_address, access);
     if (!translated.ok()) return translated;
