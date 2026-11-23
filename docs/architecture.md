@@ -38,3 +38,16 @@ The first CPU slice defines a host-independent guest architectural state:
 The system-register layer intentionally returns an unavailable result for registers that are not implemented. It does not silently fabricate values. ELR_EL1, ESR_EL1, and FAR_EL1 are reserved in the enum for later exception-model work and are not yet readable or writable.
 
 This is an initial state model, not a complete Arm ARM implementation. In particular, exception entry/return, SPSel semantics, access permissions/traps, system-register encodings, and architectural feature discovery remain future work. Guest privileged state is modeled in software and must never be executed directly on the Android host.
+
+
+## Initial AArch64 decoder
+
+The decoder currently recognizes a bounded instruction subset:
+
+- MOVN, MOVZ, MOVK wide-immediate encodings.
+- ADD, ADDS, SUB, SUBS immediate encodings.
+- B, BL, and B.cond.
+- BR, BLR, and RET.
+- Integer GPR LDR/STR unsigned-immediate encodings.
+
+The decoder returns a typed record containing the raw encoding and extracted operands. It does not execute instructions. Unsupported or reserved encodings are reported as Unsupported. Execution semantics, condition evaluation, memory access faults, and architectural exception delivery belong to the interpreter and subsequent CPU model layers.
