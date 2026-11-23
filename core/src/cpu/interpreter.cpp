@@ -9,6 +9,7 @@ namespace {
 
 [[nodiscard]] constexpr bool condition_passed(const PState& flags,
                                                std::uint8_t condition) noexcept {
+    if (condition >= 0xEU) return true;
     const bool result = [&]() noexcept {
         switch (condition & 0xEU) {
         case 0x0U: return flags.z;
@@ -91,14 +92,12 @@ ExecutionStatus AArch64Interpreter::execute(
 
     case InstructionKind::BranchImmediate:
         if (instruction.link) state.write_x(30U, next_pc);
-        state.set_pc(static_cast<std::uint64_t>(
-            static_cast<std::int64_t>(pc) + instruction.signed_immediate));
+        state.set_pc(pc + static_cast<std::uint64_t>(instruction.signed_immediate));
         return ExecutionStatus::Executed;
 
     case InstructionKind::BranchConditional:
         state.set_pc(condition_passed(state.pstate(), instruction.condition)
-                         ? static_cast<std::uint64_t>(
-                               static_cast<std::int64_t>(pc) + instruction.signed_immediate)
+                         ? pc + static_cast<std::uint64_t>(instruction.signed_immediate)
                          : next_pc);
         return ExecutionStatus::Executed;
 
