@@ -140,11 +140,14 @@ ExecutionStatus AArch64Interpreter::execute(
         if (instruction.tlbi_op == TlbiOperation::VMALLE1) {
             stage1_tlb->invalidate_all();
         } else if (instruction.tlbi_op == TlbiOperation::VAE1) {
-            // VAE1 invalidates by VA for all ASIDs. This implementation has
-            // no ASID/global-entry model and keys translations by 4KB page.
             constexpr std::uint64_t kVaOperandMask = 0x00FFFFFFFFFFF000ULL;
             const auto operand = state.read_x(instruction.rn);
-            stage1_tlb->invalidate_va(operand & kVaOperandMask);
+            const auto asid = static_cast<std::uint16_t>((operand >> 48U) & 0xFFFFU);
+            stage1_tlb->invalidate_va_asid(operand & kVaOperandMask, asid);
+        } else if (instruction.tlbi_op == TlbiOperation::ASIDE1) {
+            const auto asid = static_cast<std::uint16_t>(
+                (state.read_x(instruction.rn) >> 48U) & 0xFFFFU);
+            stage1_tlb->invalidate_asid(asid);
         } else {
             return ExecutionStatus::UnsupportedInstruction;
         }
