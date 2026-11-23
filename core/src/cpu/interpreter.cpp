@@ -1,5 +1,7 @@
 #include "niemu/cpu/interpreter.hpp"
 
+#include <limits>
+
 namespace niemu::cpu {
 namespace {
 
@@ -49,7 +51,7 @@ void set_sub_flags(PState& flags, std::uint64_t lhs, std::uint64_t rhs,
 } // namespace
 
 ExecutionStatus AArch64Interpreter::execute(
-    CpuState& state, const DecodedInstruction& instruction) noexcept {
+    CpuState& state, const DecodedInstruction& instruction,\n    memory::MemoryBus* memory_bus) noexcept {
     const auto pc = state.pc();
     const auto next_pc = pc + 4U;
 
