@@ -8,12 +8,12 @@ constexpr std::uint64_t kPageOffsetMask = 0xFFFU;
 bool Stage1Tlb::synchronize_configuration(const cpu::CpuState& state) noexcept {
     const auto& regs = state.translation_registers();
     if (!configuration_valid_ ||
-        ttbr0_snapshot_ != regs.ttbr0_el1 ||
+        ttbr0_snapshot_ != (regs.ttbr0_el1 & 0x0000FFFFFFFFF000ULL) ||
         tcr_snapshot_ != regs.tcr_el1 ||
         sctlr_snapshot_ != regs.sctlr_el1) {
         entries_.fill({});
         replacement_index_ = 0U;
-        ttbr0_snapshot_ = regs.ttbr0_el1;
+        ttbr0_snapshot_ = regs.ttbr0_el1 & 0x0000FFFFFFFFF000ULL;
         tcr_snapshot_ = regs.tcr_el1;
         sctlr_snapshot_ = regs.sctlr_el1;
         configuration_valid_ = true;
@@ -27,10 +27,15 @@ VirtualAddressTranslation Stage1Tlb::translate(
     std::uint64_t virtual_address, MemoryAccess access) noexcept {
     (void)synchronize_configuration(state);
     const auto virtual_page = virtual_address >> 12U;
+    const auto& regs = state.translation_registers();
+    const bool asid_16_bit = ((regs.tcr_el1 >> 36U) & 1U) != 0U;
+    const auto current_asid = static_cast<std::uint16_t>(
+        asid_16_bit ? ((regs.ttbr0_el1 >> 48U) & 0xFFFFU)
+                    : ((regs.ttbr0_el1 >> 56U) & 0xFFU));
 
     for (auto& entry : entries_) {
         if (entry.valid && entry.virtual_page == virtual_page &&
-            entry.access == access) {
+            entry.access == access && (entry.global || entry.asid == current_asid)) {
             ++hits_;
             return {MmuFault::None,
                     (entry.physical_page << 12U) | (virtual_address & kPageOffsetMask),
@@ -48,6 +53,8 @@ VirtualAddressTranslation Stage1Tlb::translate(
     entry.physical_page = translated.physical_address >> 12U;
     entry.access = access;
     entry.translation_level = translated.translation_level;
+    entry.asid = translated.asid;
+    entry.global = translated.global;
     entry.valid = true;
     replacement_index_ = (replacement_index_ + 1U) % kCapacity;
     return translated;
@@ -61,9 +68,22 @@ void Stage1Tlb::invalidate_all() noexcept {
 void Stage1Tlb::invalidate_va(std::uint64_t virtual_address) noexcept {
     const auto virtual_page = virtual_address >> 12U;
     for (auto& entry : entries_) {
-        if (entry.valid && entry.virtual_page == virtual_page) {
-            entry.valid = false;
-        }
+        if (entry.valid && entry.virtual_page == virtual_page) entry.valid = false;
+    }
+}
+
+void Stage1Tlb::invalidate_asid(std::uint16_t asid) noexcept {
+    for (auto& entry : entries_) {
+        if (entry.valid && !entry.global && entry.asid == asid) entry.valid = false;
+    }
+}
+
+void Stage1Tlb::invalidate_va_asid(
+    std::uint64_t virtual_address, std::uint16_t asid) noexcept {
+    const auto virtual_page = virtual_address >> 12U;
+    for (auto& entry : entries_) {
+        if (entry.valid && entry.virtual_page == virtual_page &&
+            (entry.global || entry.asid == asid)) entry.valid = false;
     }
 }
 
